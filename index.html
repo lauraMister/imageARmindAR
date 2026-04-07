@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>Planet AR</title>
+    <title>Planet AR Test</title>
 
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -18,48 +18,64 @@
         background: #000;
         font-family: Arial, sans-serif;
       }
-
-      #startOverlay {
+      #ui {
         position: fixed;
         inset: 0;
-        z-index: 20;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 0, 0, 0.78);
+        z-index: 30;
+        pointer-events: none;
       }
-
-      #startButton {
-        border: 0;
-        padding: 14px 20px;
-        font-size: 16px;
+      #panel {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        right: 16px;
+        background: rgba(0,0,0,.72);
+        color: #fff;
+        padding: 14px;
         border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      #startButton {
+        pointer-events: auto;
+        margin-top: 10px;
+        border: 0;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 16px;
         cursor: pointer;
       }
-
-      #hint {
-        position: fixed;
-        left: 50%;
-        bottom: 20px;
-        transform: translateX(-50%);
-        z-index: 15;
-        color: white;
-        background: rgba(0,0,0,0.58);
-        padding: 10px 14px;
-        border-radius: 10px;
-        font-size: 14px;
-        text-align: center;
-        max-width: 90vw;
+      #log {
+        white-space: pre-wrap;
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      #assetLinks {
+        margin-top: 10px;
+      }
+      #assetLinks a {
+        color: #9ad1ff;
+        pointer-events: auto;
+        margin-right: 12px;
       }
     </style>
   </head>
 
   <body>
-    <div id="startOverlay">
-      <button id="startButton">Avvia AR</button>
+    <div id="ui">
+      <div id="panel">
+        <div><strong>Test MindAR</strong></div>
+        <div id="status">Stato: pagina caricata</div>
+        <button id="startButton">Avvia AR</button>
+        <div id="assetLinks">
+          <a href="./targets.mind" target="_blank" rel="noopener">Apri targets.mind</a>
+          <a href="./planet.jpg" target="_blank" rel="noopener">Apri planet.jpg</a>
+          <a href="./planet.mp4" target="_blank" rel="noopener">Apri planet.mp4</a>
+        </div>
+        <div id="log"></div>
+      </div>
     </div>
-
-    <div id="hint">Premi “Avvia AR”, consenti la camera, poi inquadra planet.jpg</div>
 
     <a-scene
       mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: yes; uiLoading: yes;"
@@ -69,100 +85,75 @@
       device-orientation-permission-ui="enabled: false"
       embedded
     >
-      <a-assets>
-        <video
-          id="planetVideo"
-          src="./planet.mp4"
-          preload="auto"
-          loop
-          muted
-          playsinline
-          webkit-playsinline
-          crossorigin="anonymous"
-        ></video>
-      </a-assets>
-
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
       <a-entity id="planetTarget" mindar-image-target="targetIndex: 0">
-        <a-video
-          src="#planetVideo"
+        <a-plane
+          color="red"
           width="1"
-          height="0.5625"
-          position="0 0 0.01"
-        ></a-video>
+          height="0.6"
+          position="0 0 0"
+        ></a-plane>
       </a-entity>
     </a-scene>
 
     <script>
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
       const startButton = document.getElementById("startButton");
-      const startOverlay = document.getElementById("startOverlay");
-      const hint = document.getElementById("hint");
       const sceneEl = document.querySelector("a-scene");
       const targetEl = document.getElementById("planetTarget");
-      const videoEl = document.getElementById("planetVideo");
 
-      const arSystem = () => sceneEl.systems["mindar-image-system"];
+      function log(msg) {
+        console.log(msg);
+        logEl.textContent += msg + "\n";
+      }
 
-      videoEl.addEventListener("loadedmetadata", () => {
-        console.log("Video caricato");
+      function setStatus(msg) {
+        statusEl.textContent = "Stato: " + msg;
+        log(msg);
+      }
+
+      window.addEventListener("error", (e) => {
+        setStatus("errore JS: " + e.message);
       });
 
-      videoEl.addEventListener("error", () => {
-        console.error("Errore video:", videoEl.error);
-        hint.textContent = "Il file planet.mp4 non viene letto correttamente dal browser.";
+      document.addEventListener("DOMContentLoaded", () => {
+        setStatus("DOM pronto");
+      });
+
+      sceneEl.addEventListener("loaded", () => {
+        setStatus("A-Frame caricato");
       });
 
       sceneEl.addEventListener("arReady", () => {
-        console.log("AR pronta");
-        hint.textContent = "AR attiva. Ora inquadra planet.jpg";
+        setStatus("AR pronta: ora inquadra planet.jpg");
       });
 
       sceneEl.addEventListener("arError", () => {
-        console.error("MindAR non è partita");
-        hint.textContent = "AR non partita. Verifica permesso camera, HTTPS e browser compatibile.";
+        setStatus("AR error: camera o targets.mind non accessibili");
       });
 
-      targetEl.addEventListener("targetFound", async () => {
-        console.log("Target trovato");
-        hint.textContent = "Target trovato";
-        try {
-          await videoEl.play();
-        } catch (e) {
-          console.error("Play video fallito:", e);
-          hint.textContent = "Target trovato, ma il video non parte.";
-        }
+      targetEl.addEventListener("targetFound", () => {
+        setStatus("TARGET TROVATO");
       });
 
       targetEl.addEventListener("targetLost", () => {
-        console.log("Target perso");
-        videoEl.pause();
-        videoEl.currentTime = 0;
-        hint.textContent = "Target perso. Reinquadra planet.jpg";
+        setStatus("target perso");
       });
 
       startButton.addEventListener("click", async () => {
-        startButton.disabled = true;
-        hint.textContent = "Avvio AR in corso...";
-
-        // Prova a “sbloccare” il video, ma senza bloccare l’AR se fallisce
         try {
-          videoEl.muted = true;
-          await videoEl.play();
-          videoEl.pause();
-          videoEl.currentTime = 0;
-          console.log("Video sbloccato");
-        } catch (e) {
-          console.warn("Pre-play video fallito, continuo comunque con AR:", e);
-        }
-
-        try {
-          await arSystem().start();
-          startOverlay.style.display = "none";
-        } catch (e) {
-          console.error("Errore start AR:", e);
-          hint.textContent = "Errore start AR. Apri la console del browser per il dettaglio.";
-          startButton.disabled = false;
+          setStatus("richiesta avvio AR...");
+          const arSystem = sceneEl.systems["mindar-image-system"];
+          if (!arSystem) {
+            setStatus("mindar-image-system non trovato");
+            return;
+          }
+          await arSystem.start();
+          setStatus("start() eseguito, attendo arReady...");
+        } catch (err) {
+          setStatus("start() fallito: " + (err?.message || err));
         }
       });
     </script>
