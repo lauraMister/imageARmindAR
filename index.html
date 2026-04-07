@@ -1,38 +1,149 @@
-<script type="module">
-  import * as THREE from "https://unpkg.com/three@0.152.2/build/three.module.js";
-  import { MindARThree } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.module.js";
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planet AR</title>
 
-  const video = document.getElementById("planet-video");
+    <!-- Librerie consigliate dalla documentazione MindAR quick start -->
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  const mindarThree = new MindARThree({
-    container: document.body,
-    imageTargetSrc: "./targets.mind",
-  });
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: Arial, sans-serif;
+      }
 
-  const { renderer, scene, camera } = mindarThree;
+      #startOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.78);
+      }
 
-  const videoTexture = new THREE.VideoTexture(video);
-  const geometry = new THREE.PlaneGeometry(1, 0.5625);
-  const material = new THREE.MeshBasicMaterial({ map: videoTexture });
-  const plane = new THREE.Mesh(geometry, material);
+      #startButton {
+        border: 0;
+        padding: 14px 20px;
+        font-size: 16px;
+        border-radius: 12px;
+        cursor: pointer;
+      }
 
-  const anchor = mindarThree.addAnchor(0);
-  anchor.group.add(plane);
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 20px;
+        transform: translateX(-50%);
+        z-index: 15;
+        color: white;
+        background: rgba(0,0,0,0.55);
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 14px;
+        text-align: center;
+      }
+    </style>
+  </head>
 
-  anchor.onTargetFound = () => {
-    video.play();
-    document.getElementById("hint").style.opacity = "0";
-  };
+  <body>
+    <div id="startOverlay">
+      <button id="startButton">Avvia AR</button>
+    </div>
 
-  anchor.onTargetLost = () => {
-    video.pause();
-    document.getElementById("hint").style.opacity = "1";
-  };
+    <div id="hint">Inquadra l'immagine planet.jpg</div>
 
-  await mindarThree.start();
-  document.getElementById("loader").style.display = "none";
+    <a-scene
+      mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: yes; uiLoading: yes;"
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      embedded
+    >
+      <a-assets>
+        <video
+          id="planetVideo"
+          src="./planet.mp4"
+          preload="auto"
+          loop
+          muted
+          playsinline
+          webkit-playsinline
+          crossorigin="anonymous"
+        ></video>
+      </a-assets>
 
-  renderer.setAnimationLoop(() => {
-    renderer.render(scene, camera);
-  });
-</script>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <a-entity id="planetTarget" mindar-image-target="targetIndex: 0">
+        <a-video
+          id="planetVideoPlane"
+          src="#planetVideo"
+          width="1"
+          height="0.5625"
+          position="0 0 0.01"
+          rotation="0 0 0"
+        ></a-video>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      const startButton = document.getElementById("startButton");
+      const startOverlay = document.getElementById("startOverlay");
+      const hint = document.getElementById("hint");
+      const sceneEl = document.querySelector("a-scene");
+      const targetEl = document.querySelector("#planetTarget");
+      const videoEl = document.querySelector("#planetVideo");
+
+      startButton.addEventListener("click", async () => {
+        try {
+          // Sblocca il video su mobile/iOS con un gesto utente
+          await videoEl.play();
+          videoEl.pause();
+          videoEl.currentTime = 0;
+
+          await sceneEl.systems["mindar-image-system"].start();
+
+          startOverlay.style.display = "none";
+          hint.textContent = "Inquadra planet.jpg per far partire il video";
+        } catch (err) {
+          console.error(err);
+          hint.textContent = "Errore avvio AR/video. Controlla permessi camera e formato MP4.";
+        }
+      });
+
+      targetEl.addEventListener("targetFound", async () => {
+        try {
+          await videoEl.play();
+          hint.textContent = "Target trovato";
+        } catch (err) {
+          console.error("Errore play video:", err);
+        }
+      });
+
+      targetEl.addEventListener("targetLost", () => {
+        videoEl.pause();
+        videoEl.currentTime = 0;
+        hint.textContent = "Target perso: reinquadra planet.jpg";
+      });
+
+      sceneEl.addEventListener("arReady", () => {
+        console.log("MindAR pronto");
+      });
+
+      sceneEl.addEventListener("arError", () => {
+        hint.textContent = "Errore AR: camera non accessibile o dispositivo/browser non compatibile";
+      });
+    </script>
+  </body>
+</html>
