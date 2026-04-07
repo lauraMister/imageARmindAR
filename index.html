@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Planet AR</title>
 
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
@@ -18,55 +19,58 @@
         font-family: Arial, sans-serif;
       }
 
-      #status {
-        position: fixed;
-        left: 50%;
-        bottom: 20px;
-        transform: translateX(-50%);
-        z-index: 20;
-        color: white;
-        background: rgba(0,0,0,0.6);
-        padding: 10px 14px;
-        border-radius: 10px;
-        font-size: 14px;
-        text-align: center;
-        max-width: 90vw;
-      }
-
-      #unlock {
+      a-scene {
         position: fixed;
         inset: 0;
-        z-index: 30;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0,0,0,0.75);
       }
 
-      #unlock button {
-        border: 0;
-        padding: 14px 20px;
-        font-size: 16px;
+      #hud {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 16px;
+        pointer-events: none;
+      }
+
+      #status {
+        color: #fff;
+        background: rgba(0, 0, 0, 0.55);
+        padding: 10px 14px;
         border-radius: 12px;
+        font-size: 14px;
+        text-align: center;
+        max-width: 92vw;
+      }
+
+      #unlockButton {
+        pointer-events: auto;
+        border: 0;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 15px;
         cursor: pointer;
       }
     </style>
   </head>
 
   <body>
-    <div id="unlock">
-      <button id="unlockButton">Abilita video</button>
+    <div id="hud">
+      <div id="status">Consenti la camera. Se la camera si apre, vedrai subito l’ambiente reale dietro questa scritta.</div>
+      <button id="unlockButton">Abilita video planet.mp4</button>
     </div>
 
-    <div id="status">Consenti la camera. Poi inquadra planet.jpg</div>
-
     <a-scene
-      mindar-image="imageTargetSrc: ./targets.mind; uiScanning: yes; uiLoading: yes;"
+      mindar-image="imageTargetSrc: ./targets.mind; uiLoading: no; uiError: no; uiScanning: no;"
       color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights"
+      renderer="colorManagement: true, physicallyCorrectLights, alpha: true"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: false"
-      embedded
     >
       <a-assets>
         <video
@@ -95,7 +99,6 @@
 
     <script>
       const statusEl = document.getElementById("status");
-      const unlockEl = document.getElementById("unlock");
       const unlockButton = document.getElementById("unlockButton");
       const sceneEl = document.querySelector("a-scene");
       const targetEl = document.getElementById("planetTarget");
@@ -114,37 +117,36 @@
           videoEl.pause();
           videoEl.currentTime = 0;
           videoUnlocked = true;
-          unlockEl.style.display = "none";
-          setStatus("Video abilitato. Ora inquadra planet.jpg");
+          setStatus("Video sbloccato. Ora inquadra planet.jpg");
         } catch (e) {
           console.error(e);
-          setStatus("Non riesco ad abilitare il video. Riprova toccando il pulsante.");
+          setStatus("Non riesco a sbloccare il video. Riprova a toccare il pulsante.");
         }
       });
 
       sceneEl.addEventListener("loaded", () => {
-        setStatus("Scena caricata. Attendi la camera...");
+        setStatus("Scena caricata. Attendo avvio camera...");
       });
 
       sceneEl.addEventListener("arReady", () => {
-        setStatus("AR pronta. Inquadra planet.jpg");
+        setStatus("AR pronta. Se tutto è ok, adesso devi vedere la camera dal vivo dietro questa barra.");
       });
 
       sceneEl.addEventListener("arError", () => {
-        setStatus("Errore AR: controlla permesso camera e browser.");
+        setStatus("Errore AR. Controlla permesso camera del browser.");
       });
 
       targetEl.addEventListener("targetFound", async () => {
-        setStatus("Target trovato");
+        if (!videoUnlocked) {
+          setStatus("Target trovato. Tocca 'Abilita video planet.mp4' per far partire il video.");
+          return;
+        }
         try {
-          if (!videoUnlocked) {
-            setStatus("Target trovato. Tocca prima 'Abilita video'.");
-            return;
-          }
           await videoEl.play();
+          setStatus("Target trovato: video in riproduzione.");
         } catch (e) {
           console.error(e);
-          setStatus("Il target è trovato, ma il video non parte.");
+          setStatus("Target trovato, ma il video non parte.");
         }
       });
 
@@ -155,12 +157,13 @@
       });
 
       videoEl.addEventListener("error", () => {
-        console.error("Errore video:", videoEl.error);
-        setStatus("Errore nel file planet.mp4");
+        console.error(videoEl.error);
+        setStatus("planet.mp4 non viene letto correttamente dal browser.");
       });
 
       window.addEventListener("error", (e) => {
         console.error("JS error:", e.message);
+        setStatus("Errore JS: " + e.message);
       });
     </script>
   </body>
