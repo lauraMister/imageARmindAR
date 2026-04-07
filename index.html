@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Planet Project - MindAR Version</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; font-family: sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
+
+    #loader {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      gap: 16px; color: white;
+    }
+    #loader .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader p { font-size: 15px; letter-spacing: 0.05em; opacity: 0.85; }
+
+    #badge {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 100; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+      color: white; font-size: 12px; letter-spacing: 0.08em;
+      padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15);
+      pointer-events: none;
+    }
+    #badge span { color: #7dd3fc; font-weight: 700; }
+
+    #hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 100; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+      color: rgba(255,255,255,0.75); font-size: 13px; padding: 8px 20px;
+      border-radius: 999px; border: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap; pointer-events: none; transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loader">
+    <div class="spinner"></div>
+    <p>Caricamento tracciamento planetario...</p>
+  </div>
+
+  <div id="badge">Libreria: <span>MindAR + Three.js</span></div>
+  <div id="hint">📷 Punta la fotocamera sul marker del pianeta</div>
+
+  <video id="planet-video" src="planet.mp4"
+    loop muted playsinline webkit-playsinline crossorigin="anonymous"
+    style="display:none;"></video>
+
+  <!-- MindAR + Three.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+
+  <script>
+    document.addEventListener("click", () => {
+      document.getElementById("planet-video").play().catch(() => {});
+    }, { once: true });
+
+    const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+      container: document.body,
+      imageTargetSrc: "./targets.mind",
+    });
+
+    const { renderer, scene, camera } = mindarThree;
+
+    const video = document.getElementById("planet-video");
+    const videoTexture = new THREE.VideoTexture(video);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+
+    // Proporzione 16:9 identica al progetto originale (width=160, height=90)
+    const geometry = new THREE.PlaneGeometry(1, 0.5625);
+    const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+    const plane = new THREE.Mesh(geometry, material);
+
+    const anchor = mindarThree.addAnchor(0);
+    anchor.group.add(plane);
+
+    anchor.onTargetFound = () => {
+      video.play().catch(() => {});
+      document.getElementById("hint").style.opacity = "0";
+    };
+
+    anchor.onTargetLost = () => {
+      video.pause();
+      document.getElementById("hint").style.opacity = "1";
+    };
+
+    mindarThree.start()
+      .then(() => {
+        document.getElementById("loader").style.display = "none";
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
+      })
+      .catch(err => {
+        document.getElementById("loader").innerHTML =
+          "<p style='color:#f87171;text-align:center;padding:24px;'>Errore avvio fotocamera.<br>Verifica i permessi nel browser.</p>";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
