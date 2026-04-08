@@ -1,170 +1,109 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>Planet AR</title>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Planet Project - MindAR Version</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; font-family: sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
+    #loader {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      gap: 16px; color: white;
+    }
+    #loader .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader p { font-size: 15px; letter-spacing: 0.05em; opacity: 0.85; }
+    #badge {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 100; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+      color: white; font-size: 12px; letter-spacing: 0.08em;
+      padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15);
+      pointer-events: none;
+    }
+    #badge span { color: #7dd3fc; font-weight: 700; }
+    #hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 100; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+      color: rgba(255,255,255,0.75); font-size: 13px; padding: 8px 20px;
+      border-radius: 999px; border: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap; pointer-events: none; transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="spinner"></div>
+    <p>Caricamento tracciamento planetario...</p>
+  </div>
+  <div id="badge">Libreria: <span>MindAR + Three.js</span></div>
+  <div id="hint">📷 Punta la fotocamera sul marker del pianeta</div>
+  
+  <video id="planet-video" src="planet.mp4"
+    loop muted playsinline webkit-playsinline crossorigin="anonymous"
+    style="display:none;"></video>
+  
+  <!-- MindAR + Three.js via CDN - URL CORRETTO -->
+  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.2/dist/mindar-image-three.prod.js"></script>
+  
+  <script>
+    // Attiva audio/video al primo click (richiesto dai browser moderni)
+    document.addEventListener("click", () => {
+      document.getElementById("planet-video").play().catch(() => {});
+    }, { once: true });
 
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    // Inizializza MindAR
+    const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+      container: document.body,
+      imageTargetSrc: "./targets.mind",
+    });
 
-    <style>
-      html, body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #000;
-        font-family: Arial, sans-serif;
-      }
+    const { renderer, scene, camera } = mindarThree;
+    const video = document.getElementById("planet-video");
+    
+    // Crea texture video
+    const videoTexture = new THREE.VideoTexture(video);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
 
-      a-scene {
-        position: fixed;
-        inset: 0;
-      }
+    // Proporzione 16:9 (width=1, height=0.5625)
+    const geometry = new THREE.PlaneGeometry(1, 0.5625);
+    const material = new THREE.MeshBasicMaterial({ 
+      map: videoTexture, 
+      side: THREE.DoubleSide 
+    });
+    const plane = new THREE.Mesh(geometry, material);
 
-      #hud {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 20;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        padding: 16px;
-        pointer-events: none;
-      }
+    // Aggiungi il video all'anchor (marker rilevato)
+    const anchor = mindarThree.addAnchor(0);
+    anchor.group.add(plane);
 
-      #status {
-        color: #fff;
-        background: rgba(0, 0, 0, 0.55);
-        padding: 10px 14px;
-        border-radius: 12px;
-        font-size: 14px;
-        text-align: center;
-        max-width: 92vw;
-      }
+    // Gestisci eventi di rilevamento
+    anchor.onTargetFound = () => {
+      video.play().catch(() => {});
+      document.getElementById("hint").style.opacity = "0";
+    };
 
-      #unlockButton {
-        pointer-events: auto;
-        border: 0;
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-size: 15px;
-        cursor: pointer;
-      }
-    </style>
-  </head>
+    anchor.onTargetLost = () => {
+      video.pause();
+      document.getElementById("hint").style.opacity = "1";
+    };
 
-  <body>
-    <div id="hud">
-      <div id="status">Consenti la camera. Se la camera si apre, vedrai subito l’ambiente reale dietro questa scritta.</div>
-      <button id="unlockButton">Abilita video planet.mp4</button>
-    </div>
-
-    <a-scene
-      mindar-image="imageTargetSrc: ./targets.mind; uiLoading: no; uiError: no; uiScanning: no;"
-      color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights, alpha: true"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-    >
-      <a-assets>
-        <video
-          id="planetVideo"
-          src="./planet.mp4"
-          preload="auto"
-          loop
-          muted
-          playsinline
-          webkit-playsinline
-          crossorigin="anonymous"
-        ></video>
-      </a-assets>
-
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-      <a-entity id="planetTarget" mindar-image-target="targetIndex: 0">
-        <a-video
-          src="#planetVideo"
-          width="1"
-          height="0.5625"
-          position="0 0 0.01"
-        ></a-video>
-      </a-entity>
-    </a-scene>
-
-    <script>
-      const statusEl = document.getElementById("status");
-      const unlockButton = document.getElementById("unlockButton");
-      const sceneEl = document.querySelector("a-scene");
-      const targetEl = document.getElementById("planetTarget");
-      const videoEl = document.getElementById("planetVideo");
-
-      let videoUnlocked = false;
-
-      function setStatus(text) {
-        statusEl.textContent = text;
-        console.log(text);
-      }
-
-      unlockButton.addEventListener("click", async () => {
-        try {
-          await videoEl.play();
-          videoEl.pause();
-          videoEl.currentTime = 0;
-          videoUnlocked = true;
-          setStatus("Video sbloccato. Ora inquadra planet.jpg");
-        } catch (e) {
-          console.error(e);
-          setStatus("Non riesco a sbloccare il video. Riprova a toccare il pulsante.");
-        }
+    // Avvia MindAR
+    mindarThree.start()
+      .then(() => {
+        document.getElementById("loader").style.display = "none";
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
+      })
+      .catch(err => {
+        document.getElementById("loader").innerHTML =
+          "<p style='color:#f87171;text-align:center;padding:24px;'>Errore avvio fotocamera.<br>Verifica i permessi nel browser.</p>";
+        console.error("Errore MindAR:", err);
       });
-
-      sceneEl.addEventListener("loaded", () => {
-        setStatus("Scena caricata. Attendo avvio camera...");
-      });
-
-      sceneEl.addEventListener("arReady", () => {
-        setStatus("AR pronta. Se tutto è ok, adesso devi vedere la camera dal vivo dietro questa barra.");
-      });
-
-      sceneEl.addEventListener("arError", () => {
-        setStatus("Errore AR. Controlla permesso camera del browser.");
-      });
-
-      targetEl.addEventListener("targetFound", async () => {
-        if (!videoUnlocked) {
-          setStatus("Target trovato. Tocca 'Abilita video planet.mp4' per far partire il video.");
-          return;
-        }
-        try {
-          await videoEl.play();
-          setStatus("Target trovato: video in riproduzione.");
-        } catch (e) {
-          console.error(e);
-          setStatus("Target trovato, ma il video non parte.");
-        }
-      });
-
-      targetEl.addEventListener("targetLost", () => {
-        videoEl.pause();
-        videoEl.currentTime = 0;
-        setStatus("Target perso. Reinquadra planet.jpg");
-      });
-
-      videoEl.addEventListener("error", () => {
-        console.error(videoEl.error);
-        setStatus("planet.mp4 non viene letto correttamente dal browser.");
-      });
-
-      window.addEventListener("error", (e) => {
-        console.error("JS error:", e.message);
-        setStatus("Errore JS: " + e.message);
-      });
-    </script>
-  </body>
+  </script>
+</body>
 </html>
