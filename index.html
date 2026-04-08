@@ -85,8 +85,23 @@
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
 
-    // Proporzione 16:9 (width=1, height=0.5625)
-    const geometry = new THREE.PlaneGeometry(1, 0.5625);
+    // CORREZIONE: Calcola proporzioni reali del video
+    // Aspetta che il video carichi i metadati per ottenere width e height reali
+    video.addEventListener('loadedmetadata', () => {
+      const videoAspect = video.videoWidth / video.videoHeight;
+      console.log(`📹 Video: ${video.videoWidth}x${video.videoHeight}, aspect: ${videoAspect.toFixed(2)}`);
+      
+      // Ridimensiona il piano con le proporzioni corrette
+      // Larghezza fissa a 1, altezza calcolata
+      plane.geometry.dispose(); // Pulisci la vecchia geometria
+      plane.geometry = new THREE.PlaneGeometry(1, 1 / videoAspect);
+    });
+
+    // Proporzioni iniziali (verranno aggiornate quando il video carica)
+    // Se il tuo video è 16:9 usa: 1, 0.5625
+    // Se il tuo video è quadrato (1:1) usa: 1, 1
+    // Se il tuo video è verticale (9:16) usa: 1, 1.778
+    const geometry = new THREE.PlaneGeometry(1, 1); // Placeholder, verrà aggiornato
     const material = new THREE.MeshBasicMaterial({ 
       map: videoTexture, 
       side: THREE.DoubleSide 
