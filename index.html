@@ -47,10 +47,29 @@
     loop muted playsinline webkit-playsinline crossorigin="anonymous"
     style="display:none;"></video>
   
-  <!-- MindAR + Three.js via CDN - URL CORRETTO -->
-  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.2/dist/mindar-image-three.prod.js"></script>
+  <!-- Carica Three.js PRIMA di MindAR -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+  
+  <!-- MindAR Image Tracking con Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-three.prod.js"></script>
   
   <script>
+    // Verifica che le librerie siano caricate
+    if (typeof THREE === 'undefined') {
+      document.getElementById("loader").innerHTML =
+        "<p style='color:#f87171;text-align:center;padding:24px;'>Errore: Three.js non caricato</p>";
+      throw new Error("Three.js non disponibile");
+    }
+    
+    if (typeof window.MINDAR === 'undefined') {
+      document.getElementById("loader").innerHTML =
+        "<p style='color:#f87171;text-align:center;padding:24px;'>Errore: MindAR non caricato<br>Controlla la connessione internet</p>";
+      throw new Error("MindAR non disponibile");
+    }
+
+    console.log("✅ Three.js caricato:", THREE.REVISION);
+    console.log("✅ MindAR caricato:", window.MINDAR);
+
     // Attiva audio/video al primo click (richiesto dai browser moderni)
     document.addEventListener("click", () => {
       document.getElementById("planet-video").play().catch(() => {});
@@ -84,25 +103,29 @@
 
     // Gestisci eventi di rilevamento
     anchor.onTargetFound = () => {
+      console.log("🎯 Marker rilevato!");
       video.play().catch(() => {});
       document.getElementById("hint").style.opacity = "0";
     };
 
     anchor.onTargetLost = () => {
+      console.log("❌ Marker perso");
       video.pause();
       document.getElementById("hint").style.opacity = "1";
     };
 
     // Avvia MindAR
+    console.log("🚀 Avvio MindAR...");
     mindarThree.start()
       .then(() => {
+        console.log("✅ MindAR avviato con successo");
         document.getElementById("loader").style.display = "none";
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
       })
       .catch(err => {
+        console.error("❌ Errore MindAR:", err);
         document.getElementById("loader").innerHTML =
-          "<p style='color:#f87171;text-align:center;padding:24px;'>Errore avvio fotocamera.<br>Verifica i permessi nel browser.</p>";
-        console.error("Errore MindAR:", err);
+          "<p style='color:#f87171;text-align:center;padding:24px;'>Errore avvio fotocamera o caricamento marker.<br>Verifica i permessi e che targets.mind sia presente.</p>";
       });
   </script>
 </body>
